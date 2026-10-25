@@ -1,6 +1,7 @@
-"""Thin client for a local Ollama server (running in WSL) used as the robot's brain.
+"""Thin client for a local Ollama server used as the robot's brain.
 
-Gemma 4 12B handles both jobs:
+Gemma 4 (E2B by default, which fits a 6 GB laptop GPU next to YOLO-World and
+Whisper; set RECEPTIONIST_MODEL=gemma4:12b on a bigger GPU) handles both jobs:
   * language: pull name / drink / interest out of what the guest said
   * vision:   describe a guest's appearance from a camera crop
 """
@@ -10,10 +11,14 @@ import os
 import re
 
 import cv2
+import numpy as np
 import requests
 
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
-MODEL = os.environ.get("RECEPTIONIST_MODEL", "gemma4:12b")
+MODEL = os.environ.get("RECEPTIONIST_MODEL", "gemma4:e2b-it-qat")
+# Ollama unloads an idle model after 5 minutes, and reloading takes over a minute.
+# -1 keeps it in VRAM until Ollama stops, so a late guest never waits for a reload.
+KEEP_ALIVE = os.environ.get("RECEPTIONIST_KEEP_ALIVE", "-1")
 
 
 def list_models():
@@ -70,6 +75,7 @@ def chat(prompt, image=None, json_mode=False, system=None, timeout=180):
         # Gemma 4 thinks by default; it can burn its whole token budget thinking and
         # return empty content, and is much slower. These short tasks don't need it.
         "think": False,
+        "keep_alive": int(KEEP_ALIVE) if KEEP_ALIVE.lstrip("-").isdigit() else KEEP_ALIVE,
         "options": {"temperature": 0.2},
     }
     if json_mode:
@@ -78,6 +84,16 @@ def chat(prompt, image=None, json_mode=False, system=None, timeout=180):
     r.raise_for_status()
     text = r.json()["message"]["content"].strip()
     return _parse_json(text) if json_mode else text
+
+
+def warm_up():
+    """Load the model (and its vision encoder) into VRAM before the first guest.
+
+    The first text call loads the weights from disk; the first image call then
+    loads the vision part. Doing both here moves that minute-plus wait to startup.
+    """
+    chat("Reply with OK.")
+    chat("What colour is this image? One word.", image=np.zeros((64, 64, 3), np.uint8))
 
 
 # ---------------------------------------------------------------- task helpers

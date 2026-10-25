@@ -98,7 +98,7 @@ def where(box, frame_w):
 
 
 class Perception:
-    def __init__(self, weights="yolov8l-worldv2.pt", conf=0.2, device=None):
+    def __init__(self, weights="weights/yolov8s-worldv2.pt", conf=0.2, device=None):
         from ultralytics import YOLOWorld  # imported here so seat logic is testable without torch
 
         self.model = YOLOWorld(weights)

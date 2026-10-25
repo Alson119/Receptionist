@@ -184,7 +184,8 @@ def main():
     ap.add_argument("--door", default="0", help="webcam index or image/video path")
     ap.add_argument("--room", default=None, help="defaults to the door source")
     ap.add_argument("--guests", type=int, default=2)
-    ap.add_argument("--weights", default="yolov8l-worldv2.pt")
+    ap.add_argument("--weights", default="weights/yolov8s-worldv2.pt",
+                    help="yolov8l-worldv2.pt is more accurate if the GPU has room")
     ap.add_argument("--host-name", default="John")
     ap.add_argument("--host-drink", default="milk")
     ap.add_argument("--host-interest", default="robotics")
@@ -205,6 +206,10 @@ def main():
         ASR = speech.ASR(args.whisper, mic=args.mic)
 
     print(f"Using Ollama model: {llm.resolve_model()} at {llm.OLLAMA_URL}")
+    print("Loading the model into the GPU (about a minute the first time)...")
+    t = time.time()
+    llm.warm_up()
+    print(f"   ready in {time.time() - t:.1f}s")
     per = Perception(args.weights)
     door = Source(args.door)
     room = door if args.room in (None, args.door) else Source(args.room)
