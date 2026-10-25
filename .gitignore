@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+# Model weights (downloaded automatically on first run; too big for GitHub)
+weights/
+*.pt
+*.onnx
+output/
